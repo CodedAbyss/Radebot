@@ -9,7 +9,7 @@
 #define PS2_CONTROLLER_MAXIMUM_VALUE 255.0
 
 #define PS2_CONTROLLER_NEUTRAL_VALUE 127.5
-#define GUN 10
+#define GUN 12
 
 #define CANDY_SHOOTER_MOTOR_PIN 8
 #define LEFT_DRIVE_MOTOR_PIN 9
@@ -67,6 +67,8 @@ void setup() {
   ps2x.config_gamepad(13, 32, 30, 38, true, true);
 }
 
+
+
 /**************************************************************
    loop()
  **************************************************************/
@@ -76,51 +78,44 @@ void loop() {
   ps2x.read_gamepad(false, vibrate);
 
   // Drive Motor Handling 
-  LX = ps2x.Analog(PSS_LX); // Reading Left stick X axis
-  RY = ps2x.Analog(PSS_RY); // Reading Right stick Y axis
-
-  if(abs(LX - PS2_CONTROLLER_NEUTRAL_VALUE) < DEADBAND_ABSOLUTE) {
-    LX = PS2_CONTROLLER_NEUTRAL_VALUE;
-  }
-  if(abs(RY - PS2_CONTROLLER_NEUTRAL_VALUE) < DEADBAND_ABSOLUTE) {
-    RY = PS2_CONTROLLER_NEUTRAL_VALUE;
-  }
-  if(LX != PS2_CONTROLLER_NEUTRAL_VALUE) {
-    if(LX <= PS2_CONTROLLER_MINIMUM_VALUE + DEADBAND_ABSOLUTE) LX = PS2_CONTROLLER_MINIMUM_VALUE;
-    else if(LX >= PS2_CONTROLLER_MAXIMUM_VALUE - DEADBAND_ABSOLUTE) LX = PS2_CONTROLLER_MAXIMUM_VALUE;
-    else if(LX > PS2_CONTROLLER_NEUTRAL_VALUE) LX -= DEADBAND_ABSOLUTE;
-    else if(LX < PS2_CONTROLLER_NEUTRAL_VALUE) LX += DEADBAND_ABSOLUTE;
-  }
-  if(RY != PS2_CONTROLLER_NEUTRAL_VALUE) {
-    if(RY <= PS2_CONTROLLER_MINIMUM_VALUE + DEADBAND_ABSOLUTE) RY = PS2_CONTROLLER_MINIMUM_VALUE;
-    else if(RY >= PS2_CONTROLLER_MAXIMUM_VALUE - DEADBAND_ABSOLUTE) RY = PS2_CONTROLLER_MAXIMUM_VALUE;
-    else if(RY > PS2_CONTROLLER_NEUTRAL_VALUE) RY -= DEADBAND_ABSOLUTE;
-    else if(RY < PS2_CONTROLLER_NEUTRAL_VALUE) RY += DEADBAND_ABSOLUTE;
-  }
-  double Throttle = ((RY - PS2_CONTROLLER_NEUTRAL_VALUE) / PS2_CONTROLLER_NEUTRAL_VALUE); //values from -1 to 1
-  double Turn = ((LX - PS2_CONTROLLER_NEUTRAL_VALUE) / PS2_CONTROLLER_NEUTRAL_VALUE); //values from -1 to 1
-  Serial.print("Throttle: ");
-  Serial.println(Throttle);
-  //Serial.print("Turn: ");
-  //Serial.println(Turn);
+  int Throttle = PS2_CONTROLLER_NEUTRAL_VALUE;
+  int Turn = PS2_CONTROLLER_NEUTRAL_VALUE;
+  float TurnPercent = 0.4;
   
-  double Left = Throttle + Turn;
-  double Right = Throttle - Turn;
+  Throttle = ps2x.Analog(PSS_LY); // Reading Left stick Y axis 0 - 255
+  Turn = ps2x.Analog(PSS_RX); // Reading Right stick X axis 0 - 255
+  
+  if(Throttle > PS2_CONTROLLER_NEUTRAL_VALUE + DEADBAND_ABSOLUTE)
+    Throttle = map(Throttle, PS2_CONTROLLER_NEUTRAL_VALUE + DEADBAND_ABSOLUTE, 255, 90, 90 + (0.9 * GUN));
+  else if(Throttle < PS2_CONTROLLER_NEUTRAL_VALUE - DEADBAND_ABSOLUTE)
+    Throttle = map(Throttle, 0, PS2_CONTROLLER_NEUTRAL_VALUE - DEADBAND_ABSOLUTE, 90 - (0.9 * GUN), 90);
+  else {
+    Throttle = 90;
+    TurnPercent *= 2;
+  }
+  if(Turn > PS2_CONTROLLER_NEUTRAL_VALUE + DEADBAND_ABSOLUTE)
+    Turn = map(Turn, PS2_CONTROLLER_NEUTRAL_VALUE + DEADBAND_ABSOLUTE, 255, 90, 90 + (0.9 * GUN * TurnPercent));
+  else if(Turn < PS2_CONTROLLER_NEUTRAL_VALUE - DEADBAND_ABSOLUTE)
+    Turn = map(Turn, 0, PS2_CONTROLLER_NEUTRAL_VALUE - DEADBAND_ABSOLUTE, 90 - (0.9 * GUN * TurnPercent), 90);
+  else Turn = 90;
 
-  if(Left > 1)
-    Left = 1;
-  if(Left < -1)
-    Left = -1;
-  if(Right > 1)
-    Right = 1;
-  if(Right < -1)
-    Right = -1;
+  int rightPower = constrain(Throttle + (Turn - 90), 0, 180);
+  int leftPower = constrain(Turn - (Throttle - 90), 0, 180);
 
-  double calculatedRightPower = (Right * .9 * GUN) + 90;
-  double calculatedLeftPower = (-Left * .9 * GUN) + 90;
+  
+  Serial.print(" Right: ");
+  Serial.print(rightPower);
+  Serial.print(" Left: ");
+  Serial.print(leftPower);
+  Serial.print(" Throttle: ");
+  Serial.print(Throttle);
+  Serial.print(" Turn: ");
+  Serial.print(Turn);
+  Serial.println();
+  //*/
 
-  leftDriveMotor.write(calculatedLeftPower);
-  rightDriveMotor.write(calculatedRightPower);
+  leftDriveMotor.write(leftPower);
+  rightDriveMotor.write(rightPower);
 
 
   //  Candy Shooter Motor Handling
